@@ -50,23 +50,22 @@ def get_new_soup(aurl):
 	global request_count
 	global global_request_count
 	global DOS_flag
+	global continous_block_number
 
 	if DOS_flag == 1:
-		continous_block_number				+= 1
-		if continous_block_number%40 and continous_block_number>1:
-			print('The last 40 ips have face DOS with the first request.')
-			print('Sleeping for 5 mins. Sleep time : '+str(time.asctime(time.localtime(time.time()))))
-			sleep(300)
-			continous_block_number 			= 0
-	else:
-		continous_block_number 				= 0
 
-	if DOS_flag == 1 :
 		call(["brew","services","stop","tor"])
+		continous_block_number				+= 1
+		if continous_block_number%15==0 and continous_block_number>1:
+			print('The last 15 ips have face DOS with the first request.')
+			print('Sleeping for 2 mins. Sleep time : '+str(time.asctime(time.localtime(time.time()))))
+			sleep(120)
+			continous_block_number 			= 0
+
 		call(["brew","services","start","tor"])
 		sleep(5)
 		while True:
-			try:
+			try: 
 				# Waiting 60 seconds to recieve a responser object
 				with time_limit(60):
 					print(requests.get("http://icanhazip.com").text)
@@ -75,6 +74,9 @@ def get_new_soup(aurl):
 				print("Error requesting for ip address.")
 				continue
 		DOS_flag 							= 0
+
+	else:
+		continous_block_number 				= 0
 
 	request_count 							+= 1
 	global_request_count 					+= 1
@@ -232,9 +234,9 @@ def get_user_paper_links(aurl):
 	global DOS_flag
 
 	pageSize 								= 100
-	startIndex 								= 163
+	startIndex 								= 0
 	flag 									= 0
-	paper_count								= 163
+	paper_count								= 0
 	page_count								= 0
 
 	# Looping over every 100 titles till no more articles are available
@@ -244,6 +246,7 @@ def get_user_paper_links(aurl):
 
 		temp_url 							= aurl + '&cstart=' + str(startIndex) + '&pagesize=' + str(pageSize)
 
+		# Requesting infinitely till no DOS(Denial of Service)
 		while True:
 			try:
 				soup 						= get_soup(temp_url)
@@ -303,6 +306,39 @@ def get_user_paper_links(aurl):
 			startIndex 						+= 100
 
 
+def get_user_citation_indices(aurl):
+	print('Storing the citation indices of the user')
+
+	global stats_dir
+
+	while  True:
+		try:
+			soup 									= get_soup(aurl)
+			stats 									= soup.find('table',{'id':'gsc_rsb_st'})
+			values 									= stats.find_all('tr')
+			break
+		except AttributeError:
+			print('Requesting again to get citation indices.')
+			DOS_flag								= 1
+
+	citation_indices_dict = {}
+
+	for value in values[1:]:
+		parts 										= value.find_all('td')
+		param_name 									= parts[0].get_text()
+		overall_value 								= int(parts[1].get_text())
+		recent_value 								= int(parts[2].get_text())
+		print('Parameter : '+param_name)
+		print('Overall value : '+str(overall_value))
+		print('Since 2011 : '+str(recent_value))
+		citation_indices_dict[param_name] = {}
+		citation_indices_dict[param_name]['overall'] = overall_value
+		citation_indices_dict[param_name]['recent'] = recent_value
+
+	with open(stats_dir+'/citation_indices.json','w') as outfile:
+		json.dump(citation_indices_dict,outfile)
+
+
 """
 	Start of the program
 """
@@ -318,7 +354,17 @@ for userName in userNames[1::]:
 		author_dir 							= base_dir+'/'+userName
 		ckdir(author_dir)
 
+		stats_dir							= author_dir+'/Stats'
+		ckdir(stats_dir)
+
+		get_user_citation_indices(link)
+
 		paper_dir 							= author_dir+'/Papers'
 		ckdir(paper_dir)
 
-		paper_links 						= get_user_paper_links(link)
+		# get_user_paper_links(link)
+
+
+print('Information fetch completed. Exiting all processes..')
+# Stopping service for tor after completing scraping
+call(["brew","services","stop","tor"])
