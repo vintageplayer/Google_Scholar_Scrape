@@ -1,9 +1,8 @@
 from subprocess import call
-call(["brew","services","start","tor"])
-import socks
-import socket
-socks.setdefaultproxy(proxy_type=socks.PROXY_TYPE_SOCKS5, addr="127.0.0.1", port=9050)
-socket.socket 								= socks.socksocket
+# import socks
+# import socket
+# socks.setdefaultproxy(proxy_type=socks.PROXY_TYPE_SOCKS5, addr="127.0.0.1", port=9050)
+# socket.socket 								= socks.socksocket
 
 import requests
 import urllib.request
@@ -39,6 +38,10 @@ global_request_count						= 0
 DOS_flag									= 0
 continous_block_number						= 0
 
+
+with open("../data/Cookies_test.json",'r') as infile:
+	cookies  = json.load(infile)
+
 # Checking existenc of the required directory 
 def ckdir(dir):
     if not os.path.exists(dir):
@@ -53,17 +56,19 @@ def get_new_soup(aurl):
 	global DOS_flag
 	global continous_block_number
 
+	global cookies
+
 	if DOS_flag == 1:
 
-		call(["brew","services","stop","tor"])
-		continous_block_number				+= 1
-		if continous_block_number%15==0 and continous_block_number>1:
-			print('The last 15 ips have face DOS with the first request.')
-			print('Sleeping for 2 mins. Sleep time : '+str(time.asctime(time.localtime(time.time()))))
-			sleep(120)
-			continous_block_number 			= 0
+		# call(["brew","services","stop","tor"])
+		# continous_block_number				+= 1
+		# if continous_block_number%15==0 and continous_block_number>1:
+		# 	print('The last 15 ips have face DOS with the first request.')
+		# 	print('Sleeping for 2 mins. Sleep time : '+str(time.asctime(time.localtime(time.time()))))
+		# 	sleep(120)
+		# 	continous_block_number 			= 0
 
-		call(["brew","services","start","tor"])
+		# call(["brew","services","start","tor"])
 		sleep(5)
 		while True:
 			try: 
@@ -80,7 +85,7 @@ def get_new_soup(aurl):
 		continous_block_number 				= 0
 
 	request_count 							+= 1
-	global_request_count 					+= 1
+	global_request_count 					+= 1   
 	print('Sending a request. Count : '+str(request_count))
 	print('Global successful request count : '+str(global_request_count))
 
@@ -92,7 +97,8 @@ def get_new_soup(aurl):
 		try:
 			try:
 				with time_limit(300):
-					content 				= requests.get(aurl,headers=hdr).content
+					# content 				= requests.get(aurl,headers=hdr).content
+					content 				= requests.get(aurl,cookies=cookies).content
 				break
 			except TimeoutException:
 				print('Request times out. Trying again...')
@@ -101,6 +107,8 @@ def get_new_soup(aurl):
 			print('Error in request. Error :')
 			print(err.message)
 			continue
+
+	sleep(10)
 
 	soup 									= BeautifulSoup(content,'html.parser')
 	return soup
@@ -289,8 +297,7 @@ def get_user_paper_links(aurl):
 				article_dict['citations'] 	= None
 			else:
 				# print('Citations exist.')
-				# Citation_Link 				= citations_data['href'] + '&num=20'
-				Citation_Link 				= citations_data['href']
+				Citation_Link 				= citations_data['href'] + '&num=20'
 				Citation_list 				= get_citation_data(Citation_Link)
 				article_dict['citations'] 	= Citation_list
 
@@ -370,5 +377,3 @@ for userName in userNames:
 
 
 print('Information fetch completed. Exiting all processes..')
-# Stopping service for tor after completing scraping
-call(["brew","services","stop","tor"])
